@@ -146,9 +146,55 @@ class DeviceScanner:
 
     def _scan_linux(self, timeout: int) -> List[BluetoothDevice]:
         """Linux平台扫描实现"""
-        self.logger.debug("使用Linux蓝牙扫描")
-        # TODO: 实现基于pybluez或bleak的扫描
-        return []
+        self.logger.debug("使用Linux蓝牙扫描 (bleak)")
+
+        try:
+            import bleak
+        except ImportError:
+            self.logger.error("bleak 未安装，无法扫描蓝牙设备")
+            return []
+
+        devices = []
+
+        async def scan_with_bleak():
+            from bleak import BleakScanner
+
+            discovered = []
+
+            def detection_callback(device, advertisement_data):
+                discovered.append({
+                    "address": device.address,
+                    "name": device.name or advertisement_data.local_name or "Unknown",
+                    "rssi": advertisement_data.rssi,
+                    "raw_data": str(advertisement_data)
+                })
+
+            scanner = BleakScanner(detection_callback=detection_callback)
+            await scanner.start()
+            await asyncio.sleep(timeout)
+            await scanner.stop()
+
+            return discovered
+
+        # 运行异步扫描
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            raw_devices = loop.run_until_complete(scan_with_bleak())
+        finally:
+            loop.close()
+
+        # 转换为 BluetoothDevice 对象
+        for dev in raw_devices:
+            device = BluetoothDevice(
+                name=dev["name"],
+                mac_address=dev["address"],
+                rssi=dev["rssi"],
+                device_class="Unknown"
+            )
+            devices.append(device)
+
+        return devices
 
     def _scan_windows(self, timeout: int) -> List[BluetoothDevice]:
         """Windows平台扫描实现"""

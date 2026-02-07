@@ -80,6 +80,15 @@ def main_gui() -> int:
     initialize_logging(config)
     logger = Logger.get_logger(__name__)
 
+    # 首先创建 QApplication（必须在任何 QWidget 之前）
+    try:
+        from PyQt5.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+    except ImportError:
+        app = None
+
     try:
         # 创建蓝牙管理器
         manager_config = {
@@ -91,20 +100,16 @@ def main_gui() -> int:
 
         logger.info("初始化蓝牙管理器")
 
-        # 创建主窗口
+        # 创建主窗口（在 QApplication 之后）
         window = MainWindow(manager, config)
 
         logger.info("启动GUI界面")
         window.show()
 
-        # 对于PyQt5，需要运行事件循环
-        try:
-            from PyQt5.QtWidgets import QApplication
-            app = QApplication.instance()
-            if app is None:
-                app = QApplication(sys.argv)
+        # 运行事件循环
+        if app:
             return app.exec_()
-        except ImportError:
+        else:
             # 对于Tkinter，窗口已经在show()中启动
             return 0
 
@@ -331,16 +336,6 @@ def main() -> int:
     else:
         return main_cli()
 
-
-def main_gui() -> int:
-    """
-    GUI模式入口（供setup.py entry_points使用）
-
-    Returns:
-        退出代码
-    """
-    # 重新定义以避免递归
-    return main_gui()
 
 
 if __name__ == "__main__":
